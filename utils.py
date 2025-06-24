@@ -69,7 +69,7 @@ class EarlyStopping:
     EMADNAME = "test_loss_diff_ema"
     PATIENCE = "patience_counter"
     PATIENCE_SUM = "patience_sum"
-    def __init__(self, data_tracker=DataTracker(), dr=EMA_RATE1(conf.TEST_BATCH_COUNT), ddr=EMA_RATE2(conf.TEST_BATCH_COUNT), save_history=False, patience=conf.TEST_BATCH_COUNT, stop_bar=0.0, grace_peroid=conf.TEST_BATCH_COUNT/4):
+    def __init__(self, data_tracker=DataTracker(), dr=conf.EMA_RATE1(conf.TEST_BATCH_COUNT), ddr=conf.EMA_RATE2(conf.TEST_BATCH_COUNT), save_history=False, patience=conf.TEST_BATCH_COUNT, stop_bar=0.0, grace_peroid=conf.TEST_BATCH_COUNT/4):
         self.stop = False
         self.data_tracker = data_tracker
         self.stop_counter = 0
