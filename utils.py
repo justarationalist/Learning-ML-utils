@@ -1,6 +1,7 @@
 # from Learning_ML_utils.utils import decay_rate, print_weight_counts, print_weight_counts, DataTracker, EarlyStopping, GraphEntryData, display_history
 
 import Learning_ML_utils.config as conf
+from conf import *
 
 def decay_rate(decay, per):
     return decay ** (1/per)
