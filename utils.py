@@ -1,6 +1,6 @@
 # from Learning_ML_utils.utils import decay_rate, print_weight_counts, print_weight_counts, DataTracker, EarlyStopping, GraphEntryData, display_history
 
-from Learning_ML_utils.config import *
+import Learning_ML_utils.config as conf
 
 def decay_rate(decay, per):
     return decay ** (1/per)
@@ -69,7 +69,7 @@ class EarlyStopping:
     EMADNAME = "test_loss_diff_ema"
     PATIENCE = "patience_counter"
     PATIENCE_SUM = "patience_sum"
-    def __init__(self, data_tracker=DataTracker(), dr=EMA_RATE1(TEST_BATCH_COUNT), ddr=EMA_RATE2(TEST_BATCH_COUNT), save_history=False, patience=TEST_BATCH_COUNT, stop_bar=0.0, grace_peroid=TEST_BATCH_COUNT/4):
+    def __init__(self, data_tracker=DataTracker(), dr=EMA_RATE1(conf.TEST_BATCH_COUNT), ddr=EMA_RATE2(conf.TEST_BATCH_COUNT), save_history=False, patience=conf.TEST_BATCH_COUNT, stop_bar=0.0, grace_peroid=conf.TEST_BATCH_COUNT/4):
         self.stop = False
         self.data_tracker = data_tracker
         self.stop_counter = 0
