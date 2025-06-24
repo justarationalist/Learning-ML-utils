@@ -1,3 +1,5 @@
+# from Learning_ML_utils.utils import decay_rate, print_weight_counts, print_weight_counts, DataTracker, EarlyStopping, GraphEntryData, display_history
+
 def decay_rate(decay, per):
     return decay ** (1/per)
 
@@ -110,7 +112,7 @@ class GraphEntryData:
         self.info = info
         self.compression_factor = compression_factor
 
-def display_history_as_graph(data_tracker, entry_data_list, final_accuracy):
+def display_history(data_tracker, entry_data_list, final_accuracy):
     get_data = lambda data_tracker, info: data_tracker.get_data(info.name)
     for i, graph_data in enumerate(entry_data_list):
         plt.figure(figsize=(10, 6))
