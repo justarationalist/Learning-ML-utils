@@ -138,10 +138,12 @@ class GraphPlot:
             plt.legend()
             plt.grid(True)
 
-def supervised_trainig_loop(data_tracker, early_stopping, graph_plot, models, optimizers, trainloader, testloader, device, forward, TESTING_RATE, print_progress, finish_message, print_weights, smoothed_train_loss_decay_rate, additional_train_records=[], additional_test_records=[], additional_post_records=[]):
+def supervised_trainig_loop(data_tracker, early_stopping, graph_plot, models, optimizers, trainloader, testloader, device, forward, TESTING_RATE, start_message, print_progress, finish_message, print_weights, smoothed_train_loss_decay_rate, additional_train_records=[], additional_test_records=[], additional_post_records=[]):
     testloader_list = list(testloader)
 
     print_weights()
+
+    start_message()
 
     data_tracker.add_track(DataTracker.TrackInfo(name=DataTracker.EPOCH, derivative=DataTracker.TrackInfo(DataTracker.EPOCH_DIFF)))
     data_tracker.add_track(DataTracker.TrackInfo(name=DataTracker.SMOOTHED_TRAIN_LOSS, save_history=True, first_record_factor=1.0, ema_decay_rate=smoothed_train_loss_decay_rate))
