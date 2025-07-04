@@ -123,13 +123,13 @@ class GraphPlot:
             plt.figure(figsize=(10, 6))
             for data_key, compression_factor in plot_datas:
                 data = self.data_tracker.get_data(data_key)
-                info = self.data_tracker.get_info(data_key)
                 count = len(data)
                 if count > 1:
                     compressed_data = [e * compression_factor for e in range(count)]
-                    plt.plot(compressed_data, data, label=data_key)
+                    re_scaled_data = [data[i] * y_scale for i in range(count)]
+                    plt.plot(compressed_data, re_scaled_data, label=data_key)
                 elif count == 1:
-                    plt.axhline(y=data[0], linestyle='--', label=f'{data_key}: {data[0]:.2f}')
+                    plt.axhline(y=data[0] * y_scale, linestyle='--', label=f'{data_key}: {data[0]:.2f}')
 
             plt.xlabel('Epoch')
             plt.ylabel('Value')
