@@ -127,7 +127,7 @@ class GraphPlot:
                 count = len(data)
                 if count > 1:
                     compressed_data = [e * compression_factor for e in range(count)]
-                    re_scaled_data = [data[i] * y_scale for i in range(count)]
+                    re_scaled_data = [data[i] for i in range(count)]
                     plt.plot(compressed_data, re_scaled_data, label=data_key)
                 elif count == 1:
                     plt.axhline(y=data[0] * y_scale, linestyle='--', label=f'{data_key}: {data[0]:.2f}')
