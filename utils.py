@@ -122,7 +122,7 @@ class GraphPlot:
     def plot(self):
         for plot_title, plot_datas in self.plots.items():
             plt.figure(figsize=(10, 6))
-            for data_key, compression_factor, y_scale in plot_datas:
+            for data_key, compression_factor in plot_datas:
                 data = self.data_tracker.get_data(data_key)
                 count = len(data)
                 if count > 1:
