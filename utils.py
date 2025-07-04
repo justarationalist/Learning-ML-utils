@@ -85,7 +85,7 @@ class DataTracker:
         return self.datas[name]
 
 class EarlyStopping:
-    def __init__(self, test_loss_decay_rate, train_loss_decay_rate, patience, grace_peroid, test_loss_re_scale_factor=1, test_loss_diff_re_scale_factor=1, stop_bar=0, data_tracker=DataTracker()):
+    def __init__(self, test_loss_decay_rate, train_loss_decay_rate, patience, grace_peroid, test_loss_diff_re_scale_factor=1, stop_bar=0, data_tracker=DataTracker()):
         self.stop = False
         self.data_tracker = data_tracker
         self.stop_counter = 0
@@ -93,7 +93,7 @@ class EarlyStopping:
         self.stop_bar = stop_bar
         self.current = -1
         self.patience = patience
-        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS, test_loss_decay_rate, save_history=True, first_record_factor=1, re_scale_factor=test_loss_re_scale_factor, derivative=DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS_DIFF, ema_decay_rate=train_loss_decay_rate, first_record_factor=1.0, save_history=True, re_scale_factor=test_loss_diff_re_scale_factor)))
+        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS, test_loss_decay_rate, save_history=True, first_record_factor=1, derivative=DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS_DIFF, ema_decay_rate=train_loss_decay_rate, first_record_factor=1.0, save_history=True, re_scale_factor=test_loss_diff_re_scale_factor)))
         data_tracker.add_track(DataTracker.TrackInfo(DataTracker.PATIENCE_HITS, 0, save_history=False, derivative=DataTracker.TrackInfo(DataTracker.PATIENCE_HITS_DIFF, ema_decay_rate=0, save_history=False)))
     def step(self, test_loss):
         self.data_tracker.record(DataTracker.SMOOTHED_TEST_LOSS, test_loss)
