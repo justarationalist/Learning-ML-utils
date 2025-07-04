@@ -29,7 +29,7 @@ class DataTracker:
     FINAL_ACCURACY_HELPER_DIFF = "final accuracy helper diff"
 
     class TrackInfo:
-        def __init__(self, name, ema_decay_rate=0.0, first_record_factor=0.0, save_history=False, derivative=None) -> None:
+        def __init__(self, name, ema_decay_rate=0, first_record_factor=0, save_history=False, derivative=None, re_scale_factor=1) -> None:
             self.ema_decay_rate = ema_decay_rate
             self.save_history = save_history
             self.derivative = derivative
@@ -38,6 +38,7 @@ class DataTracker:
                 self.derivative.antiderivative = self
             self.name = name
             self.first_record_factor = first_record_factor
+            self.re_scale_factor = re_scale_factor
 
             self.omdcr = 1 - self.ema_decay_rate
     def __init__(self, track_info_list=[]) -> None:
@@ -59,8 +60,8 @@ class DataTracker:
         data = self.datas[name]
         info = self.track_info[name]
 
-        prev = data[-1] if len(data) > 0 else value * info.first_record_factor
-        updated_val = prev * info.ema_decay_rate + value * info.omdcr
+        prev = data[-1] if len(data) > 0 else value * info.first_record_factor * info.re_scale_factor
+        updated_val = prev * info.ema_decay_rate + value * info.omdcr * info.re_scale_factor
 
         if info.save_history:
             data.append(updated_val)
@@ -71,11 +72,11 @@ class DataTracker:
                 data[0] = updated_val
 
         if info.derivative is not None:
-            self.record(info.derivative.name, updated_val - prev, False, True)
+            self.record(info.derivative.name, (updated_val - prev) / info.re_scale_factor, False, True)
         if compute_antiderivative and info.antiderivative is not None:
             anti_der_data = self.get_data(info.antiderivative.name)
-            anti_dev_val_recent = self.get_data(info.antiderivative.name)[-1] if len(anti_der_data) > 0 else 0
-            self.record(info.antiderivative.name, updated_val + anti_dev_val_recent, True, False)
+            anti_der_val_recent = self.get_data(info.antiderivative.name)[-1] if len(anti_der_data) > 0 else 0
+            self.record(info.antiderivative.name, updated_val / info.re_scale_factor + anti_der_val_recent, True, False)
 
 
     def get_info(self, name):
@@ -84,7 +85,7 @@ class DataTracker:
         return self.datas[name]
 
 class EarlyStopping:
-    def __init__(self, test_loss_decay_rate, train_loss_decay_rate, patience, grace_peroid, stop_bar=0.0, data_tracker=DataTracker()):
+    def __init__(self, test_loss_decay_rate, train_loss_decay_rate, patience, grace_peroid, test_loss_diff_re_scale_factor, stop_bar=0.0, data_tracker=DataTracker()):
         self.stop = False
         self.data_tracker = data_tracker
         self.stop_counter = 0
@@ -92,7 +93,7 @@ class EarlyStopping:
         self.stop_bar = stop_bar
         self.current = -1
         self.patience = patience
-        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS, test_loss_decay_rate, save_history=True, first_record_factor=1, derivative=DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS_DIFF, ema_decay_rate=train_loss_decay_rate, first_record_factor=1.0, save_history=True)))
+        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS, test_loss_decay_rate, save_history=True, first_record_factor=1, derivative=DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS_DIFF, ema_decay_rate=train_loss_decay_rate, first_record_factor=1.0, save_history=True, re_scale_factor=test_loss_diff_re_scale_factor)))
         data_tracker.add_track(DataTracker.TrackInfo(DataTracker.PATIENCE_HITS, 0, save_history=False, derivative=DataTracker.TrackInfo(DataTracker.PATIENCE_HITS_DIFF, ema_decay_rate=0, save_history=False)))
     def step(self, test_loss):
         self.data_tracker.record(DataTracker.SMOOTHED_TEST_LOSS, test_loss)
