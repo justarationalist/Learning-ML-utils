@@ -130,7 +130,7 @@ class GraphPlot:
                     re_scaled_data = [data[i] for i in range(count)]
                     plt.plot(compressed_data, re_scaled_data, label=data_key)
                 elif count == 1:
-                    plt.axhline(y=data[0] * y_scale, linestyle='--', label=f'{data_key}: {data[0]:.2f}')
+                    plt.axhline(y=data[0], linestyle='--', label=f'{data_key}: {data[0]:.2f}')
 
             plt.xlabel('Epoch')
             plt.ylabel('Value')
