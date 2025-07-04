@@ -1,7 +1,6 @@
-# from ML_utils.utils import decay_rate, print_weight_counts, print_weight_counts, DataTracker, EarlyStopping, GraphEntryData, display_history
-
 import torch
 import matplotlib.pyplot as plt
+import random
 
 def decay_rate(decay, per):
     return decay ** (1/per)
@@ -17,11 +16,26 @@ def print_weight_counts(model):
     print(f"total: {total}")
 
 class DataTracker:
+
+    SMOOTHED_TRAIN_LOSS = "smoothed train loss"
+    SMOOTHED_TEST_LOSS = "smoothed test loss"
+    SMOOTHED_TEST_LOSS_DIFF = "smoothed test loss diff"
+    SMOOTHED_TEST_ACCURACY = "smoothed test accuracy"
+    EPOCH = "epoch"
+    EPOCH_DIFF = "epoch diff"
+    PATIENCE_HITS = "patience hits"
+    PATIENCE_HITS_DIFF = "patience hits diff"
+    FINAL_ACCURACY = "final accuracy"
+    FINAL_ACCURACY_HELPER_DIFF = "final accuracy helper diff"
+
     class TrackInfo:
-        def __init__(self, ema_decay_rate, name, first_record_factor=0.0, save_history=False, derivative=None) -> None:
+        def __init__(self, name, ema_decay_rate=0.0, first_record_factor=0.0, save_history=False, derivative=None) -> None:
             self.ema_decay_rate = ema_decay_rate
             self.save_history = save_history
             self.derivative = derivative
+            self.antiderivative = None
+            if derivative is not None:
+                self.derivative.antiderivative = self
             self.name = name
             self.first_record_factor = first_record_factor
 
@@ -38,7 +52,7 @@ class DataTracker:
         self.datas[track_info.name] = []
         if track_info.derivative is not None:
             self.add_track(track_info.derivative, d+1)
-    def record(self, name, value):
+    def record(self, name, value, compute_antiderivative=True, compute_derivative=True):
         if isinstance(value, torch.Tensor):
             value = value.item()
 
@@ -57,7 +71,11 @@ class DataTracker:
                 data[0] = updated_val
 
         if info.derivative is not None:
-            self.record(info.derivative.name, updated_val - prev)
+            self.record(info.derivative.name, updated_val - prev, False, True)
+        if compute_antiderivative and info.antiderivative is not None:
+            anti_der_data = self.get_data(info.antiderivative.name)
+            anti_dev_val_recent = self.get_data(info.antiderivative.name)[-1] if len(anti_der_data) > 0 else 0
+            self.record(info.antiderivative.name, updated_val + anti_dev_val_recent, True, False)
 
 
     def get_info(self, name):
@@ -66,11 +84,7 @@ class DataTracker:
         return self.datas[name]
 
 class EarlyStopping:
-    EMANAME = "test_loss_ema"
-    EMADNAME = "test_loss_diff_ema"
-    PATIENCE = "patience_counter"
-    PATIENCE_SUM = "patience_sum"
-    def __init__(self, dr, ddr, save_history, patience, grace_peroid, stop_bar=0.0, data_tracker=DataTracker()):
+    def __init__(self, test_loss_decay_rate, train_loss_decay_rate, patience, grace_peroid, stop_bar=0.0, data_tracker=DataTracker()):
         self.stop = False
         self.data_tracker = data_tracker
         self.stop_counter = 0
@@ -78,10 +92,10 @@ class EarlyStopping:
         self.stop_bar = stop_bar
         self.current = -1
         self.patience = patience
-        data_tracker.add_track(DataTracker.TrackInfo(dr, EarlyStopping.EMANAME, save_history=save_history, first_record_factor=1, derivative=DataTracker.TrackInfo(ddr, EarlyStopping.EMADNAME, first_record_factor=1, save_history=save_history)))
-        data_tracker.add_track(DataTracker.TrackInfo(0, EarlyStopping.PATIENCE_SUM, save_history=save_history, first_record_factor=0, derivative=DataTracker.TrackInfo(0, EarlyStopping.PATIENCE, save_history=save_history, first_record_factor=0)))
+        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS, test_loss_decay_rate, save_history=True, first_record_factor=1, derivative=DataTracker.TrackInfo(DataTracker.SMOOTHED_TEST_LOSS_DIFF, ema_decay_rate=train_loss_decay_rate, first_record_factor=1.0, save_history=True)))
+        data_tracker.add_track(DataTracker.TrackInfo(DataTracker.PATIENCE_HITS, 0, save_history=False, derivative=DataTracker.TrackInfo(DataTracker.PATIENCE_HITS_DIFF, ema_decay_rate=0, save_history=False)))
     def step(self, test_loss):
-        self.data_tracker.record(EarlyStopping.EMANAME, test_loss)
+        self.data_tracker.record(DataTracker.SMOOTHED_TEST_LOSS, test_loss)
         self.current += 1
 
         if self.current >= self.grace_peroid and self.last_test_loss_diff_ema() > self.stop_bar:
@@ -89,53 +103,111 @@ class EarlyStopping:
             if self.stop_counter == self.patience:
                 self.stop = True
     def epoch_step(self):
-        self.data_tracker.record(EarlyStopping.PATIENCE_SUM, self.stop_counter)
+        self.data_tracker.record(DataTracker.PATIENCE_HITS_DIFF, self.stop_counter)
+        self.stop_counter = 0
     def last_test_loss_ema(self):
-        return self.data_tracker.get_data(EarlyStopping.EMANAME)[-1]
+        return self.data_tracker.get_data(DataTracker.SMOOTHED_TEST_LOSS)[-1]
     def last_test_loss_diff_ema(self):
-        return self.data_tracker.get_data(EarlyStopping.EMADNAME)[-1]
+        return self.data_tracker.get_data(DataTracker.SMOOTHED_TEST_LOSS_DIFF)[-1]
     def last_patience_counter_diff(self):
-        return self.data_tracker.get_data(EarlyStopping.PATIENCE)[-1]
+        return self.data_tracker.get_data(DataTracker.PATIENCE_HITS_DIFF)[-1]
     def last_patience_counter(self):
-        return self.data_tracker.get_data(EarlyStopping.PATIENCE_SUM)[-1]
+        return self.data_tracker.get_data(DataTracker.PATIENCE_HITS)[-1]
 
-def print_weight_counts(model):
-    total = 0
-    print("parameters {")
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            total += param.numel()
-            print(f"  {name}: {param.numel()},")
-    print("}")
-    print(f"total: {total}")
+class GraphPlot:
+    def __init__(self, data_tracker, plots) -> None:
+        self.data_tracker = data_tracker
+        self.plots = plots
+    def plot(self):
+        for plot_title, plot_datas in self.plots.items():
+            plt.figure(figsize=(10, 6))
+            for data_key, compression_factor in plot_datas:
+                data = self.data_tracker.get_data(data_key)
+                info = self.data_tracker.get_info(data_key)
+                count = len(data)
+                if count > 1:
+                    compressed_data = [e * compression_factor for e in range(count)]
+                    plt.plot(compressed_data, data, label=data_key)
+                elif count == 1:
+                    plt.axhline(y=data[0], linestyle='--', label=f'{data_key}: {data[0]:.2f}')
 
-class GraphEntryData:
-    def __init__(self, info, compression_factor=1.0, name=None) -> None:
-        self.name = name if name is not None else info.name
-        self.info = info
-        self.compression_factor = compression_factor
-
-def display_history(data_tracker, entry_data_list, final_accuracy):
-    get_data = lambda data_tracker, info: data_tracker.get_data(info.name)
-    for i, graph_data in enumerate(entry_data_list):
-        plt.figure(figsize=(10, 6))
-        graph_title = "Training and Testing History"
-        for entry in graph_data:
-            data = get_data(data_tracker, entry)
-            epochs = range(len(data))
-            compressed_epochs = [e * entry.compression_factor for e in epochs]
-            plt.plot(compressed_epochs, data, label=entry.name)
-            if entry.name:
-                graph_title = entry.name
-
-        plt.xlabel('Epoch')
-        plt.ylabel('Value')
-        plt.title(graph_title)
-        plt.legend()
-        plt.grid(True)
-
-        if i == 0: #display final accuracy on the first graph
-            plt.axhline(y=final_accuracy, color='r', linestyle='--', label=f'Final Accuracy: {final_accuracy:.2f}')
+            plt.xlabel('Epoch')
+            plt.ylabel('Value')
+            plt.title(plot_title)
             plt.legend()
+            plt.grid(True)
 
-        plt.show()
+def supervised_trainig_loop(data_tracker, early_stopping, graph_plot, models, optimizers, trainloader, testloader, device, forward, TESTING_RATE, print_progress, finish_message, print_weights, smoothed_train_loss_decay_rate, additional_train_records=[], additional_test_records=[], additional_post_records=[]):
+    testloader_list = list(testloader)
+
+    print_weights()
+
+    data_tracker.add_track(DataTracker.TrackInfo(name=DataTracker.EPOCH, derivative=DataTracker.TrackInfo(DataTracker.EPOCH_DIFF)))
+    data_tracker.add_track(DataTracker.TrackInfo(name=DataTracker.SMOOTHED_TRAIN_LOSS, save_history=True, first_record_factor=1.0, ema_decay_rate=smoothed_train_loss_decay_rate))
+
+    def unpack(data):
+        inputs, labels = data
+        inputs, labels = inputs.to(device), labels.to(device)
+        return inputs, labels
+    def _train():
+        for model in models:
+            model.train()
+    def _eval():
+        for model in models:
+            model.eval()
+    def _zero_grad():
+        for optimizer in optimizers:
+            optimizer.zero_grad()
+    def _step():
+        for optimizer in optimizers:
+            optimizer.step()
+    def additional_records(fn_list, inputs, targets, outputs):
+        for fn in fn_list:
+            name, val = fn(inputs, targets, outputs)
+            data_tracker.record(name, val)
+
+    while True:
+        data_tracker.record(DataTracker.EPOCH_DIFF, 1)
+        _train()
+        for i, data in enumerate(trainloader, 0):
+            inputs, targets = unpack(data)
+            _zero_grad()
+
+            loss, outputs = forward(inputs, targets)
+
+            data_tracker.record(DataTracker.SMOOTHED_TRAIN_LOSS, loss)
+            additional_records(additional_train_records, inputs, targets, outputs)
+
+            loss.backward()
+            _step()
+
+            if (i - 1) % TESTING_RATE == 0:
+                _eval()
+                with torch.no_grad():
+                    inputs, targets = unpack(random.choice(testloader_list))
+                    loss, outputs = forward(inputs, targets)
+                    additional_records(additional_test_records, inputs, targets, outputs)
+                early_stopping.step(loss)
+                if early_stopping.stop:
+                    early_stopping.epoch_step()
+                    print_progress(i)
+                else:
+                    _train()
+                if early_stopping.stop:
+                    break
+        if early_stopping.stop:
+            break
+        else:
+            early_stopping.epoch_step()
+            print_progress()
+
+    _eval()
+    for i, data in enumerate(testloader, 0):
+          with torch.no_grad():
+              inputs, targets = unpack(random.choice(testloader_list))
+              loss, outputs = forward(inputs, targets)
+          additional_records(additional_post_records, inputs, targets, outputs)
+
+    finish_message()
+
+    graph_plot.plot()
